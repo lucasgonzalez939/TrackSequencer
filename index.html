@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-lang-key="pageTitle">Secuenciador de Música</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome CDN for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background */
+            color: #e2e8f0; /* Light text */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to top */
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #2d3748; /* Slightly lighter dark background */
+            border-radius: 1rem; /* Rounded corners */
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.3);
+            padding: 2rem;
+            width: 100%;
+            max-width: 1200px; /* Max width for larger screens */
+            position: relative; /* For absolute positioning of language button */
+        }
+        /* Page Title Styling */
+        .page-title {
+            background: linear-gradient(45deg, #4299e1, #9f7aea);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2.5rem; /* Smaller font size */
+            text-shadow: 0 4px 10px rgba(66, 153, 225, 0.4); /* Subtle shadow */
+            letter-spacing: 0.05em; /* A bit more spacing */
+            transition: all 0.3s ease-in-out;
+        }
+        .page-title:hover {
+            transform: translateY(-2px) scale(1.02);
+            text-shadow: 0 6px 15px rgba(66, 153, 225, 0.6);
+        }
+
+        .grid-cell {
+            width: 40px; /* Fixed width for cells */
+            height: 40px; /* Fixed height for cells */
+            border: 1px solid #4a5568; /* Border for cells */
+            border-radius: 0.375rem; /* Rounded corners */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.1s ease-in-out;
+            font-weight: bold; /* Make step numbers bold */
+            color: #e2e8f0; /* Ensure step numbers are visible */
+        }
+        .grid-cell.active {
+            background-color: #4299e1; /* Blue for active notes */
+        }
+        .grid-cell.playing {
+            border: 2px solid #f6e05e; /* Yellow border for playing step */
+        }
+        .current-step-highlight {
+            background-color: #f6ad55; /* Orange for current playing column */
+            opacity: 0.3;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 40px; /* Match cell width */
+            transition: transform 0.1s ease-in-out;
+            pointer-events: none; /* Allow clicks to pass through */
+        }
+        /* Custom scrollbar for track list */
+        .track-list-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        .track-list-container::-webkit-scrollbar-track {
+            background: #2d3748;
+            border-radius: 10px;
+        }
+        .track-list-container::-webkit-scrollbar-thumb {
+            background: #4a5568;
+            border-radius: 10px;
+        }
+        .track-list-container::-webkit-scrollbar-thumb:hover {
+            background: #5a67d8;
+        }
+        .waveform-wrapper {
+            position: relative; /* Crucial for positioning handles */
+            width: 400px; /* Fixed width for waveform visualization */
+            height: 60px; /* Fixed height for waveform */
+            background-color: #1a202c;
+            border-radius: 0.5rem;
+            overflow: hidden; /* Keep handles within bounds */
+        }
+        .waveform-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .trim-handle {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 16px; /* Increased width for easier touch interaction */
+            background-color: #f6ad55; /* Orange handle color */
+            cursor: ew-resize;
+            z-index: 10;
+            opacity: 0.7;
+            border-radius: 4px;
+            transform: translateX(-50%); /* Center the handle on its calculated position */
+        }
+        .trim-handle.start {
+            left: var(--handle-position);
+        }
+        .trim-handle.end {
+            left: var(--handle-position);
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4299e1;
+            cursor: pointer;
+            box-shadow: 0 0 2px rgba(0,0,0,0.5);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4299e1;
+            cursor: pointer;
+            box-shadow: 0 0 2px rgba(0,0,0,0.5);
+        }
+        .track-block {
+            background-color: #374151; /* Slightly darker background for each track */
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 1px solid #4a5568;
+        }
+
+        /* Main control button styling for icon-only */
+        .main-control-button {
+            padding: 0.75rem 1rem; /* Adjust padding for icon-only buttons */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .main-control-button i {
+            margin-right: 0 !important; /* Ensure no margin for icon-only */
+        }
+        /* Hide span text for all main control buttons */
+        .main-control-button span {
+            display: none;
+        }
+
+        /* Responsive adjustments for smaller screens if needed, though now icons are default */
+        @media (max-width: 768px) {
+            .main-control-button {
+                padding: 0.75rem; /* Even smaller padding for very small screens */
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="container">
+        <h1 class="font-bold text-center mb-6 page-title" data-lang-key="mainTitle">Secuenciador de Música</h1>
+
+        <!-- Language Toggle Button (Top Right) -->
+        <div class="absolute top-4 right-4 z-20">
+            <button id="languageToggle" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-lg shadow-md transition duration-300 ease-in-out text-sm">
+                <span data-lang-key="languageButton">English</span>
+            </button>
+        </div>
+
+        <!-- Main Controls Section -->
+        <div class="bg-gray-700 p-6 rounded-lg mb-8 shadow-md">
+            <!-- Project Name Field -->
+            <div class="flex flex-wrap justify-center items-center gap-4 mb-4">
+                <label for="projectNameInput" class="text-gray-300 font-semibold" data-lang-key="projectNameLabel">Nombre del Proyecto:</label>
+                <input type="text" id="projectNameInput" value="Mi Cancion" class="bg-gray-800 text-white p-2 rounded-lg flex-grow max-w-xs text-center">
+            </div>
+
+            <!-- Single Row for all main controls -->
+            <div class="flex flex-wrap justify-center gap-4">
+                <button id="recordButton" class="main-control-button bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-md transition duration-300 ease-in-out">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button id="playButton" class="main-control-button bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md transition duration-300 ease-in-out">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button id="pauseButton" class="main-control-button bg-yellow-600 hover:bg-yellow-700 text-white font-bold rounded-lg shadow-md transition duration-300 ease-in-out">
+                    <i class="fas fa-pause"></i>
+                </button>
+                <div class="flex items-center gap-2">
+                    <input type="number" id="bpmInput" value="120" min="60" max="240" class="bg-gray-800 text-white p-2 rounded-lg w-24 text-center">
+                    <label for="bpmInput" class="text-gray-300" data-lang-key="bpmLabel">BPM</label>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="gridLengthSelect" class="text-gray-300" data-lang-key="stepsLabel">Pasos:</label>
+                    <select id="gridLengthSelect" class="bg-gray-800 text-white p-2 rounded-lg">
+                        <option value="8">8</option>
+                        <option value="16" selected>16</option>
+                        <option value="32">32</option>
+                        <option value="64">64</option>
+                        <option value="128">128</option>
+                    </select>
+                </div>
+                <button id="undoButton" class="main-control-button bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg shadow-md transition duration-300 ease-in-out" disabled>
+                    <i class="fas fa-undo-alt"></i>
+                </button>
+                <button id="redoButton" class="main-control-button bg-gray-600 hover:bg-gray-700 text-white font-bold rounded-lg shadow-md transition duration-300 ease-in-out" disabled>
+                    <i class="fas fa-redo-alt"></i>
+                </button>
+                <button id="downloadSongButton" class="main-control-button bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow-md transition duration-300 ease-in-out">
+                    <i class="fas fa-download"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Messages Section -->
+        <div id="recordingMessage" class="hidden text-center text-yellow-400 mb-4" data-lang-key="recordingMessage">
+            Grabando... Haz clic en "Grabar Nueva Pista" de nuevo para detener.
+        </div>
+        <div id="maxTracksMessage" class="hidden text-center text-red-400 mb-4" data-lang-key="maxTracksMessage">
+            ¡Máximo de 20 pistas alcanzado!
+        </div>
+        <div id="downloadingMessage" class="hidden text-center text-blue-400 mb-4" data-lang-key="downloadingMessage">
+            Mezclando y preparando la descarga...
+        </div>
+
+        <!-- Sequencer Grid -->
+        <div class="overflow-x-auto relative">
+            <div id="currentStepHighlight" class="current-step-highlight hidden"></div>
+            <div id="sequencerGrid" class="flex flex-col">
+                <!-- Tracks will be added here by JS -->
+            </div>
+        </div>
+
+        <!-- Credits Footer -->
+        <footer class="text-center text-gray-500 text-sm mt-8">
+            Created by Lucas G with Gemini
+        </footer>
+    </div>
+
+    <script>
+        // Global variables for audio context and recorder
+        let audioContext;
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let tracks = []; // Array to store { id, name, audioBuffer, notes: [], startOffset, endOffset, volume: 1, pitch: 0 }
+        const MAX_TRACKS = 20;
+        let NUM_STEPS = 16; // 16 steps in the sequencer, now variable
+        let currentStep = 0;
+        let isPlaying = false;
+        let sequencerInterval;
+        let bpm = 120; // Beats per minute
+        let projectName = "Mi Cancion"; // Default project name
+
+        // Undo/Redo History
+        let history = [];
+        let historyPointer = -1;
+        const MAX_HISTORY = 50; // Max number of states to keep in history
+
+        // Trim handle dragging state
+        let isDraggingStartHandle = false;
+        let isDraggingEndHandle = false;
+        let currentDraggingTrackId = null;
+        let initialMouseX = 0;
+        let initialOffsetValue = 0;
+
+        // Language
+        let currentLanguage = 'es'; // Default language is now Spanish
+
+        // Language strings
+        const languageStrings = {
+            en: {
+                pageTitle: "Music Sequencer",
+                mainTitle: "Music Sequencer",
+                projectNameLabel: "Project Name:",
+                recordButton: "Record New Track",
+                stopRecordingButton: "Stop Recording",
+                playButton: "Play",
+                playingButton: "Playing...",
+                pauseButton: "Pause",
+                bpmLabel: "BPM",
+                downloadButton: "Download Song",
+                undoButton: "Undo",
+                redoButton: "Redo",
+                stepsLabel: "Steps:",
+                languageButton: "Español",
+                recordingMessage: "Recording... Click \"Record New Track\" again to stop.",
+                maxTracksMessage: "Maximum 20 tracks reached!",
+                downloadingMessage: "Mixing and preparing download...",
+                clearNotesButton: "Clear Notes",
+                deleteButton: "Delete",
+                startLabel: "Start:",
+                endLabel: "End:",
+                applyTrimButton: "Apply Trim",
+                volumeLabel: "Vol:",
+                pitchLabel: "Pitch:",
+                microphoneError: "Could not access microphone. Please ensure it is connected and permissions are granted.",
+                noTracksToDownload: "No tracks to download!",
+                songDownloaded: "Song downloaded successfully!",
+                downloadError: "Error downloading song. Check console for details.",
+                bpmRangeError: "BPM must be between 60 and 240.",
+                trimApplied: "Trim applied and state saved!",
+                track: "Track",
+                defaultFilename: "My_Song" // Added default filename for English
+            },
+            es: {
+                pageTitle: "Secuenciador de Música",
+                mainTitle: "Secuenciador de Música",
+                projectNameLabel: "Nombre del Proyecto:",
+                recordButton: "Grabar Nueva Pista",
+                stopRecordingButton: "Detener Grabación",
+                playButton: "Reproducir",
+                playingButton: "Reproduciendo...",
+                pauseButton: "Pausar",
+                bpmLabel: "BPM",
+                downloadButton: "Descargar Cancion",
+                undoButton: "Deshacer",
+                redoButton: "Rehacer",
+                stepsLabel: "Pasos:",
+                languageButton: "English",
+                recordingMessage: "Grabando... Haz clic en \"Grabar Nueva Pista\" de nuevo para detener.",
+                maxTracksMessage: "¡Máximo de 20 pistas alcanzado!",
+                downloadingMessage: "Mezclando y preparando la descarga...",
+                clearNotesButton: "Borrar Notas",
+                deleteButton: "Eliminar",
+                startLabel: "Inicio:",
+                endLabel: "Fin:",
+                applyTrimButton: "Aplicar Recorte",
+                volumeLabel: "Vol:",
+                pitchLabel: "Tono:",
+                microphoneError: "No se pudo acceder al micrófono. Asegúrate de que esté conectado y los permisos concedidos.",
+                noTracksToDownload: "¡No hay pistas para descargar!",
+                songDownloaded: "¡Canción descargada exitosamente!",
+                downloadError: "Error al descargar la canción. Consulta la consola para más detalles.",
+                bpmRangeError: "El BPM debe estar entre 60 y 240.",
+                trimApplied: "¡Recorte aplicado y estado guardado!",
+                track: "Pista",
+                defaultFilename: "Mi_Cancion" // Added default filename for Spanish
+            }
+        };
+
+        // DOM elements
+        const projectNameInput = document.getElementById('projectNameInput');
+        const recordButton = document.getElementById('recordButton');
+        const playButton = document.getElementById('playButton');
+        const pauseButton = document.getElementById('pauseButton');
+        const bpmInput = document.getElementById('bpmInput');
+        const downloadSongButton = document.getElementById('downloadSongButton');
+        const undoButton = document.getElementById('undoButton');
+        const redoButton = document.getElementById('redoButton');
+        const gridLengthSelect = document.getElementById('gridLengthSelect');
+        const languageToggle = document.getElementById('languageToggle');
+        const recordingMessage = document.getElementById('recordingMessage');
+        const maxTracksMessage = document.getElementById('maxTracksMessage');
+        const downloadingMessage = document.getElementById('downloadingMessage');
+        const sequencerGrid = document.getElementById('sequencerGrid');
+        const currentStepHighlight = document.getElementById('currentStepHighlight');
+
+        // --- Utility Functions ---
+
+        /**
+         * Updates all text elements on the page based on the current language.
+         */
+        function updateLanguage() {
+            const elements = document.querySelectorAll('[data-lang-key]');
+            elements.forEach(element => {
+                const key = element.dataset.langKey;
+                if (languageStrings[currentLanguage][key]) {
+                    // For buttons with icons, update the span inside (if it exists)
+                    const spanElement = element.querySelector('span');
+                    if (spanElement) {
+                        spanElement.textContent = languageStrings[currentLanguage][key];
+                    }
+                    // For labels, update textContent directly
+                    else if (element.tagName === 'LABEL') {
+                        element.textContent = languageStrings[currentLanguage][key];
+                    }
+                    // For other elements, update textContent directly
+                    else {
+                        element.textContent = languageStrings[currentLanguage][key];
+                    }
+                }
+            });
+
+            // Special handling for the language toggle button itself
+            languageToggle.textContent = currentLanguage === 'en' ? languageStrings.en.languageButton : languageStrings.es.languageButton;
+            document.title = languageStrings[currentLanguage].pageTitle; // Update page title
+
+            // Update track names if they were generated with a language-dependent prefix
+            tracks.forEach(track => {
+                const trackNameElement = document.querySelector(`#track-block-${track.id} .text-sm`);
+                if (trackNameElement) {
+                    // Assuming track names are like "Track 1", "Pista 1"
+                    const trackNumber = track.name.split(' ').pop(); // Get the number part
+                    trackNameElement.textContent = `${languageStrings[currentLanguage].track} ${trackNumber}`;
+                }
+            });
+        }
+
+        /**
+         * Generates a unique ID.
+         * @returns {string} A unique ID.
+         */
+        function generateId() {
+            return 'track-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        }
+
+        /**
+         * Deep clones an object to avoid reference issues in history.
+         * @param {object} obj - The object to clone.
+         * @returns {object} A deep copy of the object.
+         */
+        function deepClone(obj) {
+            if (obj === null || typeof obj !== 'object') {
+                return obj;
+            }
+            if (obj instanceof AudioBuffer) {
+                // AudioBuffer cannot be directly cloned via JSON.parse/stringify
+                // We'll just return the reference, as it's immutable once decoded.
+                return obj;
+            }
+            if (Array.isArray(obj)) {
+                return obj.map(item => deepClone(item));
+            }
+            const clone = {};
+            for (let key in obj) {
+                if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                    clone[key] = deepClone(obj[key]);
+                }
+            }
+            return clone;
+        }
+
+        /**
+         * Converts an AudioBuffer to a Blob (WAV format).
+         * @param {AudioBuffer} audioBuffer - The AudioBuffer to convert.
+         * @returns {Blob} The audio data as a Blob.
+         */
+        function audioBufferToWavBlob(audioBuffer) {
+            const numOfChan = audioBuffer.numberOfChannels;
+            const length = audioBuffer.length * numOfChan * 2 + 44; // 2 bytes per sample, 44 bytes for WAV header
+            const buffer = new ArrayBuffer(length);
+            const view = new DataView(buffer);
+            const channels = [];
+            let offset = 0;
+            let pos = 0;
+
+            // Write WAV header
+            writeString(view, pos, 'RIFF'); pos += 4;
+            view.setUint32(pos, length - 8, true); pos += 4; // File size - 8
+            writeString(view, pos, 'WAVE'); pos += 4;
+            writeString(view, pos, 'fmt '); pos += 4;
+            view.setUint32(pos, 16, true); pos += 4; // Subchunk1Size (16 for PCM)
+            view.setUint16(pos, 1, true); pos += 2; // AudioFormat (1 for PCM)
+            view.setUint16(pos, numOfChan, true); pos += 2; // NumChannels
+            view.setUint32(pos, audioBuffer.sampleRate, true); pos += 4; // SampleRate
+            view.setUint32(pos, audioBuffer.sampleRate * numOfChan * 2, true); pos += 4; // ByteRate
+            view.setUint16(pos, numOfChan * 2, true); pos += 2; // BlockAlign
+            view.setUint16(pos, 16, true); pos += 2; // BitsPerSample (16-bit)
+            writeString(view, pos, 'data'); pos += 4;
+            view.setUint32(pos, length - pos, true); pos += 4; // Subchunk2Size (data size)
+
+            // Get channel data
+            for (let i = 0; i < numOfChan; i++) {
+                channels.push(audioBuffer.getChannelData(i));
+            }
+
+            // Interleave and write samples
+            while (pos < length) {
+                for (let i = 0; i < numOfChan; i++) {
+                    let sample = Math.max(-1, Math.min(1, channels[i][offset])); // Clamp to [-1, 1]
+                    sample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF; // Convert to 16-bit PCM
+                    view.setInt16(pos, sample, true); pos += 2;
+                }
+                offset++;
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+
+            function writeString(view, offset, string) {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            }
+        }
+
+        /**
+         * Draws the waveform of an AudioBuffer onto a canvas.
+         * @param {HTMLCanvasElement} canvas - The canvas element to draw on.
+         * @param {AudioBuffer} audioBuffer - The AudioBuffer to visualize.
+         */
+        function drawWaveform(canvas, audioBuffer) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#1a202c'; // Background color for waveform
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (!audioBuffer) return;
+
+            const data = audioBuffer.getChannelData(0); // Get data from the first channel
+            const bufferLength = data.length;
+
+            const sliceWidth = canvas.width * 1.0 / bufferLength;
+            let x = 0;
+
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = '#4299e1'; // Waveform color
+
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height / 2);
+
+            for (let i = 0; i < bufferLength; i++) {
+                const value = data[i];
+                const y = (value * canvas.height / 2) + canvas.height / 2;
+                ctx.lineTo(x, y);
+                x += sliceWidth;
+            }
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+        }
+
+        /**
+         * Attaches global event listeners for trim handle dragging (mouse and touch).
+         */
+        function setupGlobalTrimListeners() {
+            document.body.addEventListener('mousemove', handleDrag);
+            document.body.addEventListener('mouseup', handleDragEnd);
+            document.body.addEventListener('touchmove', handleDrag);
+            document.body.addEventListener('touchend', handleDragEnd);
+        }
+
+        /**
+         * Handles the start of a drag operation for trim handles.
+         * @param {Event} e - The mouse or touch event.
+         * @param {string} trackId - The ID of the track being dragged.
+         * @param {'start' | 'end'} handleType - The type of handle being dragged.
+         */
+        function handleDragStart(e, trackId, handleType) {
+            e.preventDefault(); // Prevent text selection or other default behaviors
+            const track = tracks.find(t => t.id === trackId);
+            if (!track || !track.audioBuffer) return;
+
+            const waveformWrapper = document.getElementById(`waveform-wrapper-${trackId}`);
+            const rect = waveformWrapper.getBoundingClientRect();
+
+            initialMouseX = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+
+            if (handleType === 'start') {
+                isDraggingStartHandle = true;
+                initialOffsetValue = track.startOffset;
+            } else {
+                isDraggingEndHandle = true;
+                initialOffsetValue = track.endOffset;
+            }
+            currentDraggingTrackId = trackId;
+        }
+
+        /**
+         * Handles the drag movement for trim handles.
+         * @param {Event} e - The mouse or touch event.
+         */
+        function handleDrag(e) {
+            if (!isDraggingStartHandle && !isDraggingEndHandle) return;
+
+            const track = tracks.find(t => t.id === currentDraggingTrackId);
+            if (!track || !track.audioBuffer) return;
+
+            const waveformWrapper = document.getElementById(`waveform-wrapper-${currentDraggingTrackId}`);
+            const rect = waveformWrapper.getBoundingClientRect();
+            const currentMouseX = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+
+            const deltaX = currentMouseX - initialMouseX;
+            const deltaSeconds = (deltaX / waveformWrapper.offsetWidth) * track.audioBuffer.duration;
+
+            let newOffset;
+            if (isDraggingStartHandle) {
+                newOffset = initialOffsetValue + deltaSeconds;
+                // Clamp between 0 and track.endOffset
+                newOffset = Math.max(0, Math.min(newOffset, track.endOffset));
+                track.startOffset = newOffset;
+            } else if (isDraggingEndHandle) {
+                newOffset = initialOffsetValue + deltaSeconds;
+                // Clamp between track.startOffset and track.audioBuffer.duration
+                newOffset = Math.max(newOffset, track.startOffset);
+                newOffset = Math.min(newOffset, track.audioBuffer.duration);
+                track.endOffset = newOffset;
+            }
+
+            // Update numerical inputs and handle positions
+            document.getElementById(`start-input-${currentDraggingTrackId}`).value = track.startOffset.toFixed(2);
+            document.getElementById(`end-input-${currentDraggingTrackId}`).value = track.endOffset.toFixed(2);
+            updateTrimHandlePositions(currentDraggingTrackId);
+
+            e.preventDefault(); // Prevent scrolling on touch devices during drag
+        }
+
+        /**
+         * Handles the end of a drag operation for trim handles.
+         */
+        function handleDragEnd() {
+            if (isDraggingStartHandle || isDraggingEndHandle) {
+                isDraggingStartHandle = false;
+                isDraggingEndHandle = false;
+                currentDraggingTrackId = null;
+                // No saveState() here, it's done by the "Apply Trim" button
+            }
+        }
+
+        /**
+         * Updates the visual position of the trim handles.
+         * @param {string} trackId - The ID of the track whose handles to update.
+         */
+        function updateTrimHandlePositions(trackId) {
+            const track = tracks.find(t => t.id === trackId);
+            if (!track || !track.audioBuffer) return;
+
+            const waveformWrapper = document.getElementById(`waveform-wrapper-${trackId}`);
+            if (!waveformWrapper) return;
+
+            const startHandle = document.getElementById(`start-handle-${trackId}`);
+            const endHandle = document.getElementById(`end-handle-${trackId}`);
+
+            const startX = (track.startOffset / track.audioBuffer.duration) * waveformWrapper.offsetWidth;
+            const endX = (track.endOffset / track.audioBuffer.duration) * waveformWrapper.offsetWidth;
+
+            if (startHandle) {
+                startHandle.style.setProperty('--handle-position', `${startX}px`);
+            }
+            if (endHandle) {
+                endHandle.style.setProperty('--handle-position', `${endX}px`);
+            }
+        }
+
+        // --- Audio Recording Functions ---
+
+        /**
+         * Starts recording audio from the microphone.
+         */
+        async function startRecording() {
+            if (tracks.length >= MAX_TRACKS) {
+                maxTracksMessage.classList.remove('hidden');
+                setTimeout(() => maxTracksMessage.classList.add('hidden'), 3000);
+                return;
+            }
+
+            try {
+                // Request microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                // Initialize AudioContext if not already
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+
+                // Create MediaRecorder instance
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = []; // Clear previous chunks
+
+                // Event listener for when data is available
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+
+                // Event listener for when recording stops
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    // Convert Blob to AudioBuffer
+                    const arrayBuffer = await audioBlob.arrayBuffer();
+                    audioContext.decodeAudioData(arrayBuffer, (audioBuffer) => {
+                        const trackId = generateId();
+                        const trackName = `${languageStrings[currentLanguage].track} ${tracks.length + 1}`;
+                        tracks.push({
+                            id: trackId,
+                            name: trackName,
+                            audioBuffer: audioBuffer,
+                            notes: Array(NUM_STEPS).fill(false), // All steps initially off
+                            startOffset: 0, // New: Start offset for playback
+                            endOffset: audioBuffer.duration, // New: End offset for playback
+                            volume: 1, // Default volume
+                            pitch: 0 // Default pitch (0 semitones)
+                        });
+                        renderSequencerGrid(); // Re-render the grid to include the new track
+                        saveState(); // Save state after adding new track
+                    }, (e) => console.error("Error decoding audio data:", e));
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordButton.innerHTML = `<i class="fas fa-stop"></i>`; // Icon only
+                recordButton.classList.remove('bg-red-600');
+                recordButton.classList.add('bg-gray-500');
+                recordingMessage.classList.remove('hidden');
+                console.log('Recording started...');
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                // Using a custom message box instead of alert()
+                showMessageBox(languageStrings[currentLanguage].microphoneError, 'Error');
+            }
+        }
+
+        /**
+         * Stops the current audio recording.
+         */
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                // Stop all tracks from the stream
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                isRecording = false;
+                recordButton.innerHTML = `<i class="fas fa-microphone"></i>`; // Icon only
+                recordButton.classList.remove('bg-gray-500');
+                recordButton.classList.add('bg-red-600');
+                recordingMessage.classList.add('hidden');
+                console.log('Recording stopped.');
+            }
+        }
+
+        // --- Sequencer Playback Functions ---
+
+        /**
+         * Plays an AudioBuffer with specified start and end offsets, volume, and pitch.
+         * @param {AudioBuffer} audioBuffer - The AudioBuffer to play.
+         * @param {number} startTime - The time in AudioContext.currentTime to start playback.
+         * @param {number} offset - The offset in the audioBuffer to start playback from (in seconds).
+         * @param {number} duration - The duration of playback from the offset (in seconds).
+         * @param {number} volume - The volume (0 to 1).
+         * @param {number} pitch - The pitch in semitones.
+         */
+        function playAudioBuffer(audioBuffer, startTime, offset = 0, duration = audioBuffer.duration, volume = 1, pitch = 0) {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const source = audioContext.createBufferSource();
+            source.buffer = audioBuffer;
+
+            // Apply pitch
+            source.playbackRate.value = Math.pow(2, pitch / 12);
+
+            // Apply volume
+            const gainNode = audioContext.createGain();
+            gainNode.gain.value = volume;
+
+            source.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            // Ensure duration is not negative or zero
+            const playbackDuration = Math.max(0.001, duration);
+            source.start(startTime, offset, playbackDuration); // Schedule playback with offset and duration
+        }
+
+        /**
+         * Advances the sequencer to the next step and plays notes.
+         */
+        function nextStep() {
+            // Remove highlight from previous step
+            const prevCells = document.querySelectorAll(`.step-column-${currentStep}`);
+            prevCells.forEach(cell => cell.classList.remove('playing'));
+
+            currentStep = (currentStep + 1) % NUM_STEPS;
+
+            // Add highlight to current step
+            const currentCells = document.querySelectorAll(`.step-column-${currentStep}`);
+            currentCells.forEach(cell => cell.classList.add('playing'));
+
+            // Update current step highlight element position
+            // The highlight should be positioned relative to the sequencerGrid's scrollable area.
+            // The `pl-[128px]` on the header row is the offset for the grid columns.
+            const offsetLeft = 128; // This should match the combined width of track controls + margin + track-block padding
+            currentStepHighlight.style.transform = `translateX(${offsetLeft + (currentStep * 40)}px)`; // 40px is cell width
+            currentStepHighlight.classList.remove('hidden');
+
+
+            // Play notes for the current step
+            tracks.forEach(track => {
+                if (track.notes[currentStep] && track.audioBuffer) {
+                    playAudioBuffer(
+                        track.audioBuffer,
+                        audioContext.currentTime,
+                        track.startOffset,
+                        track.endOffset - track.startOffset,
+                        track.volume,
+                        track.pitch
+                    );
+                }
+            });
+        }
+
+        /**
+         * Starts the sequencer playback.
+         */
+        function startSequencer() {
+            if (isPlaying) return;
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            isPlaying = true;
+            const intervalTime = (60 / bpm) * 1000 / 4; // Time per 16th note
+            sequencerInterval = setInterval(nextStep, intervalTime);
+            playButton.innerHTML = `<i class="fas fa-play"></i>`; // Icon only
+            playButton.classList.remove('bg-green-600');
+            playButton.classList.add('bg-gray-500');
+            pauseButton.classList.remove('bg-gray-500');
+            pauseButton.classList.add('bg-yellow-600');
+            currentStepHighlight.classList.remove('hidden'); // Show highlight when playing
+            console.log('Sequencer started.');
+        }
+
+        /**
+         * Pauses the sequencer playback.
+         */
+        function pauseSequencer() {
+            if (!isPlaying) return;
+            isPlaying = false;
+            clearInterval(sequencerInterval);
+            // Remove all step highlights
+            document.querySelectorAll('.grid-cell.playing').forEach(cell => cell.classList.remove('playing'));
+            playButton.innerHTML = `<i class="fas fa-play"></i>`; // Icon only
+            playButton.classList.remove('bg-gray-500');
+            playButton.classList.add('bg-green-600');
+            pauseButton.classList.remove('bg-yellow-600');
+            pauseButton.classList.add('bg-gray-500');
+            currentStepHighlight.classList.add('hidden'); // Hide highlight when paused
+            console.log('Sequencer paused.');
+        }
+
+        /**
+         * Downloads the full mixed song as a WAV file, repeated twice.
+         */
+        async function downloadSong() {
+            if (tracks.length === 0) {
+                showMessageBox(languageStrings[currentLanguage].noTracksToDownload, 'Info');
+                return;
+            }
+
+            downloadingMessage.classList.remove('hidden');
+            downloadSongButton.disabled = true;
+
+            // Get project name for filename
+            const filename = (projectNameInput.value.trim() || languageStrings[currentLanguage].defaultFilename || 'Mi_Cancion').replace(/[^a-z0-9_]/gi, '_');
+
+            // Calculate total duration of the sequence in seconds
+            const secondsPerBeat = 60 / bpm;
+            const secondsPerStep = secondsPerBeat / 4; // Assuming 16th notes
+            const singleSequenceDuration = NUM_STEPS * secondsPerStep;
+            const totalSequenceDuration = singleSequenceDuration * 2; // Repeat twice
+
+            // Find the maximum duration needed for any track's playback within the sequence
+            let maxTrackPlaybackDuration = 0;
+            tracks.forEach(track => {
+                if (track.audioBuffer) {
+                    const trimmedDuration = track.endOffset - track.startOffset;
+                    maxTrackPlaybackDuration = Math.max(maxTrackPlaybackDuration, trimmedDuration);
+                }
+            });
+
+            // The length of the offline context should be at least the total sequence duration
+            // plus the longest possible playback of a single trimmed note.
+            const totalRenderDuration = totalSequenceDuration + maxTrackPlaybackDuration;
+
+            // Ensure AudioContext is initialized before creating OfflineAudioContext
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            // Get the number of channels from the existing audioContext, default to 2 if not available
+            const numberOfChannels = audioContext.destination.channelCount || 2;
+
+
+            // Create an OfflineAudioContext for rendering
+            const offlineCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
+                numberOfChannels, // Use the determined number of channels
+                audioContext.sampleRate * totalRenderDuration,
+                audioContext.sampleRate
+            );
+
+            // Schedule all notes from all tracks, repeated twice
+            for (let rep = 0; rep < 2; rep++) { // Loop for two repetitions
+                tracks.forEach(track => {
+                    if (track.audioBuffer) {
+                        for (let i = 0; i < NUM_STEPS; i++) {
+                            if (track.notes[i]) {
+                                const source = offlineCtx.createBufferSource();
+                                source.buffer = track.audioBuffer;
+
+                                // Apply pitch for offline rendering
+                                source.playbackRate.value = Math.pow(2, track.pitch / 12);
+
+                                // Apply volume for offline rendering
+                                const gainNode = offlineCtx.createGain();
+                                gainNode.gain.value = track.volume;
+
+                                source.connect(gainNode);
+                                gainNode.connect(offlineCtx.destination);
+
+                                const noteStartTime = (rep * singleSequenceDuration) + (i * secondsPerStep);
+                                const trimmedDuration = track.endOffset - track.startOffset;
+                                const playbackDuration = Math.max(0.001, trimmedDuration); // Ensure positive duration
+
+                                source.start(noteStartTime, track.startOffset, playbackDuration);
+                            }
+                        }
+                    }
+                });
+            }
+
+
+            try {
+                const renderedBuffer = await offlineCtx.startRendering();
+                const wavBlob = audioBufferToWavBlob(renderedBuffer);
+
+                const url = URL.createObjectURL(wavBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${filename}.wav`; // Use project name for download
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url); // Clean up the URL
+
+                downloadingMessage.classList.add('hidden');
+                downloadSongButton.disabled = false;
+                showMessageBox(languageStrings[currentLanguage].songDownloaded, 'Success');
+
+            } catch (e) {
+                console.error('Error rendering or downloading song:', e);
+                downloadingMessage.classList.add('hidden');
+                downloadSongButton.disabled = false;
+                showMessageBox(languageStrings[currentLanguage].downloadError, 'Error');
+            }
+        }
+
+        // --- UI Rendering and Interaction ---
+
+        /**
+         * Renders (or re-renders) the entire sequencer grid.
+         */
+        function renderSequencerGrid() {
+            sequencerGrid.innerHTML = ''; // Clear existing grid content
+
+            // Create track rows
+            tracks.forEach(track => {
+                const trackBlock = document.createElement('div');
+                trackBlock.className = 'track-block flex flex-row items-center';
+                trackBlock.id = `track-block-${track.id}`;
+                trackBlock.style.width = 'fit-content'; // Ensure it fits content for horizontal scrolling
+
+                // Track Name and Controls
+                const trackControls = document.createElement('div');
+                trackControls.className = 'flex flex-col items-start w-24 mr-4 flex-shrink-0';
+
+                const trackName = document.createElement('span');
+                trackName.className = 'text-sm font-semibold text-gray-300 truncate w-full mb-1';
+                trackName.textContent = track.name;
+                trackControls.appendChild(trackName);
+
+                const trackButtons = document.createElement('div');
+                trackButtons.className = 'flex flex-col gap-1'; /* Stack buttons vertically */
+
+                const clearButton = document.createElement('button');
+                clearButton.className = 'bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded-md transition duration-300 ease-in-out';
+                clearButton.innerHTML = `<i class="fas fa-eraser mr-1"></i> <span data-lang-key="clearNotesButton">${languageStrings[currentLanguage].clearNotesButton}</span>`;
+                clearButton.onclick = () => clearTrackNotes(track.id);
+                trackButtons.appendChild(clearButton);
+
+                const deleteButton = document.createElement('button');
+                    deleteButton.className = 'bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded-md transition duration-300 ease-in-out';
+                deleteButton.innerHTML = `<i class="fas fa-trash-alt mr-1"></i> <span data-lang-key="deleteButton">${languageStrings[currentLanguage].deleteButton}</span>`;
+                deleteButton.onclick = () => deleteTrack(track.id);
+                trackButtons.appendChild(deleteButton);
+
+                trackControls.appendChild(trackButtons);
+                trackBlock.appendChild(trackControls);
+
+                // Main content area for notes and waveform
+                const mainContent = document.createElement('div');
+                mainContent.className = 'flex flex-col flex-grow';
+
+                // Waveform and Trim Controls
+                const waveformContainer = document.createElement('div');
+                waveformContainer.className = 'flex flex-col items-center mb-2 p-2 bg-gray-700 rounded-lg';
+
+                const waveformWrapper = document.createElement('div');
+                waveformWrapper.className = 'waveform-wrapper';
+                waveformWrapper.id = `waveform-wrapper-${track.id}`;
+
+                const waveformCanvas = document.createElement('canvas');
+                waveformCanvas.className = 'waveform-canvas';
+                waveformCanvas.width = 400; // Fixed width for waveform visualization
+                waveformCanvas.height = 60;
+                waveformCanvas.id = `waveform-canvas-${track.id}`;
+                waveformWrapper.appendChild(waveformCanvas);
+
+                const startHandle = document.createElement('div');
+                startHandle.className = 'trim-handle start';
+                startHandle.id = `start-handle-${track.id}`;
+                startHandle.addEventListener('mousedown', (e) => handleDragStart(e, track.id, 'start'));
+                startHandle.addEventListener('touchstart', (e) => handleDragStart(e, track.id, 'start'));
+                waveformWrapper.appendChild(startHandle);
+
+                const endHandle = document.createElement('div');
+                endHandle.className = 'trim-handle end';
+                endHandle.id = `end-handle-${track.id}`;
+                endHandle.addEventListener('mousedown', (e) => handleDragStart(e, track.id, 'end'));
+                endHandle.addEventListener('touchstart', (e) => handleDragStart(e, track.id, 'end'));
+                waveformWrapper.appendChild(endHandle);
+
+                waveformContainer.appendChild(waveformWrapper);
+
+                const trimInputsAndButton = document.createElement('div');
+                trimInputsAndButton.className = 'flex flex-wrap gap-2 mt-2 text-sm items-center justify-center';
+
+                const startLabel = document.createElement('label');
+                startLabel.className = 'text-gray-400';
+                startLabel.dataset.langKey = 'startLabel';
+                startLabel.textContent = languageStrings[currentLanguage].startLabel;
+                trimInputsAndButton.appendChild(startLabel);
+
+                const startInput = document.createElement('input');
+                startInput.type = 'number';
+                startInput.step = '0.01';
+                startInput.min = '0';
+                startInput.value = track.startOffset.toFixed(2);
+                startInput.id = `start-input-${track.id}`;
+                startInput.className = 'bg-gray-800 text-white p-1 rounded-md w-20 text-center';
+                startInput.onchange = (e) => {
+                    updateTrackTrimFromInput(track.id, 'start', parseFloat(e.target.value));
+                };
+                trimInputsAndButton.appendChild(startInput);
+
+                const endLabel = document.createElement('label');
+                endLabel.className = 'text-gray-400';
+                endLabel.dataset.langKey = 'endLabel';
+                endLabel.textContent = languageStrings[currentLanguage].endLabel;
+                trimInputsAndButton.appendChild(endLabel);
+
+                const endInput = document.createElement('input');
+                endInput.type = 'number';
+                endInput.step = '0.01';
+                endInput.min = '0';
+                endInput.value = track.endOffset.toFixed(2);
+                endInput.id = `end-input-${track.id}`;
+                endInput.className = 'bg-gray-800 text-white p-1 rounded-md w-20 text-center';
+                endInput.onchange = (e) => {
+                    updateTrackTrimFromInput(track.id, 'end', parseFloat(e.target.value));
+                };
+                trimInputsAndButton.appendChild(endInput);
+
+                const applyTrimButton = document.createElement('button');
+                applyTrimButton.className = 'bg-indigo-500 hover:bg-indigo-600 text-white text-xs py-1 px-3 rounded-md transition duration-300 ease-in-out';
+                applyTrimButton.innerHTML = `<i class="fas fa-check mr-1"></i> <span data-lang-key="applyTrimButton">${languageStrings[currentLanguage].applyTrimButton}</span>`;
+                applyTrimButton.onclick = () => applyTrim(track.id);
+                trimInputsAndButton.appendChild(applyTrimButton);
+
+                waveformContainer.appendChild(trimInputsAndButton);
+                mainContent.appendChild(waveformContainer);
+
+                // Volume and Pitch Controls
+                const audioControls = document.createElement('div');
+                audioControls.className = 'flex flex-wrap gap-4 mt-2 justify-center'; /* Use flex-wrap for responsiveness */
+
+                const volumeControl = document.createElement('div');
+                volumeControl.className = 'flex items-center gap-2';
+                volumeControl.innerHTML = `<label class="text-xs text-gray-400 w-12" data-lang-key="volumeLabel">${languageStrings[currentLanguage].volumeLabel}</label>
+                                           <input type="range" min="0" max="1" step="0.01" value="${track.volume}" class="flex-grow bg-gray-600 rounded-lg appearance-none cursor-pointer" id="volume-${track.id}">`;
+                audioControls.appendChild(volumeControl);
+                volumeControl.querySelector(`#volume-${track.id}`).oninput = (e) => updateTrackVolume(track.id, parseFloat(e.target.value));
+
+                const pitchControl = document.createElement('div');
+                pitchControl.className = 'flex items-center gap-2';
+                pitchControl.innerHTML = `<label class="text-xs text-gray-400 w-12" data-lang-key="pitchLabel">${languageStrings[currentLanguage].pitchLabel}</label>
+                                          <input type="range" min="-12" max="12" step="1" value="${track.pitch}" class="flex-grow bg-gray-600 rounded-lg appearance-none cursor-pointer" id="pitch-${track.id}">`;
+                audioControls.appendChild(pitchControl);
+                pitchControl.querySelector(`#pitch-${track.id}`).oninput = (e) => updateTrackPitch(track.id, parseInt(e.target.value));
+
+                mainContent.appendChild(audioControls);
+
+
+                // Grid cells for notes
+                const notesContainer = document.createElement('div');
+                notesContainer.className = 'flex flex-grow';
+                for (let i = 0; i < NUM_STEPS; i++) {
+                    const cell = document.createElement('div');
+                    cell.className = `grid-cell flex-shrink-0 step-column-${i}`;
+                    cell.textContent = i + 1; // Step number embedded in the cell
+                    if (track.notes[i]) {
+                        cell.classList.add('active');
+                    }
+                    cell.dataset.trackId = track.id;
+                    cell.dataset.stepIndex = i;
+                    cell.onclick = (event) => toggleNote(event.target);
+                    notesContainer.appendChild(cell);
+                }
+                mainContent.appendChild(notesContainer);
+                trackBlock.appendChild(mainContent);
+                sequencerGrid.appendChild(trackBlock);
+
+                // Draw waveform and set up trim handles after the canvas is appended to the DOM
+                if (track.audioBuffer) {
+                    drawWaveform(waveformCanvas, track.audioBuffer);
+                    updateTrimHandlePositions(track.id); // Set initial positions
+                }
+            });
+
+            // Adjust highlight width based on first cell
+            const firstCell = document.querySelector('.grid-cell');
+            if (firstCell) {
+                currentStepHighlight.style.width = `${firstCell.offsetWidth}px`;
+            }
+            updateUndoRedoButtons(); // Update button states after rendering
+        }
+
+        /**
+         * Updates the trim (start/end offset) for a specific track based on input fields.
+         * This function is called when the number input values are changed directly.
+         * @param {string} trackId - The ID of the track to update.
+         * @param {'start' | 'end'} type - Whether to update 'startOffset' or 'endOffset'.
+         * @param {number} value - The new value in seconds.
+         */
+        function updateTrackTrimFromInput(trackId, type, value) {
+            const track = tracks.find(t => t.id === trackId);
+            if (track && track.audioBuffer) {
+                const maxDuration = track.audioBuffer.duration;
+                let newValue = Math.max(0, Math.min(maxDuration, value)); // Clamp value
+
+                if (type === 'start') {
+                    // Ensure startOffset is not greater than endOffset
+                    newValue = Math.min(newValue, track.endOffset);
+                    track.startOffset = newValue;
+                } else { // type === 'end'
+                    // Ensure endOffset is not less than startOffset
+                    newValue = Math.max(newValue, track.startOffset);
+                    newValue = Math.min(newValue, track.audioBuffer.duration); // Also clamp to max duration
+                    track.endOffset = newValue;
+                }
+                // Update the input field to reflect the clamped value
+                document.getElementById(`${type}-input-${track.id}`).value = track[type + 'Offset'].toFixed(2);
+                updateTrimHandlePositions(track.id); // Update handle positions
+                // No saveState() here, it's done by the "Apply Trim" button
+            }
+        }
+
+        /**
+         * Applies the current trim settings for a track and saves the state.
+         * @param {string} trackId - The ID of the track to apply trim to.
+         */
+        function applyTrim(trackId) {
+            const track = tracks.find(t => t.id === trackId);
+            if (track) {
+                // The track's startOffset and endOffset are already updated by handleDrag or input change.
+                // We just need to save the state now.
+                saveState();
+                showMessageBox(languageStrings[currentLanguage].trimApplied, 'Success');
+            }
+        }
+
+
+        /**
+         * Updates the volume for a specific track.
+         * @param {string} trackId - The ID of the track to update.
+         * @param {number} volume - The new volume value (0 to 1).
+         */
+        function updateTrackVolume(trackId, volume) {
+            const track = tracks.find(t => t.id === trackId);
+            if (track) {
+                track.volume = Math.max(0, Math.min(1, volume));
+                saveState(); // Save state after volume change
+            }
+        }
+
+        /**
+         * Updates the pitch for a specific track.
+         * @param {string} trackId - The ID of the track to update.
+         * @param {number} pitch - The new pitch value in semitones (-12 to 12).
+         */
+        function updateTrackPitch(trackId, pitch) {
+            const track = tracks.find(t => t.id === trackId);
+            if (track) {
+                track.pitch = Math.max(-12, Math.min(12, pitch));
+                saveState(); // Save state after pitch change
+            }
+        }
+
+        /**
+         * Toggles a note (active/inactive) on the sequencer grid.
+         * @param {HTMLElement} cellElement - The clicked grid cell element.
+         */
+        function toggleNote(cellElement) {
+            const trackId = cellElement.dataset.trackId;
+            const stepIndex = parseInt(cellElement.dataset.stepIndex);
+
+            const track = tracks.find(t => t.id === trackId);
+            if (track) {
+                track.notes[stepIndex] = !track.notes[stepIndex];
+                cellElement.classList.toggle('active', track.notes[stepIndex]);
+                saveState(); // Save state after toggling note
+            }
+        }
+
+        /**
+         * Clears all notes for a specific track.
+         * @param {string} trackId - The ID of the track to clear.
+         */
+        function clearTrackNotes(trackId) {
+            const track = tracks.find(t => t.id === trackId);
+            if (track) {
+                track.notes.fill(false); // Set all notes to false
+                renderSequencerGrid(); // Re-render to update UI
+                saveState(); // Save state after clearing notes
+            }
+        }
+
+        /**
+         * Deletes a track from the sequencer.
+         * @param {string} trackId - The ID of the track to delete.
+         */
+        function deleteTrack(trackId) {
+            tracks = tracks.filter(t => t.id !== trackId);
+            renderSequencerGrid(); // Re-render to update UI
+            if (tracks.length === 0 && isPlaying) {
+                pauseSequencer(); // Pause if no tracks left
+            }
+            saveState(); // Save state after deleting track
+        }
+
+        /**
+         * Sets the number of steps in the sequencer grid.
+         * @param {number} newLength - The new number of steps.
+         */
+        function setGridLength(newLength) {
+            if (newLength === NUM_STEPS) return; // No change
+
+            NUM_STEPS = newLength;
+            // Adjust notes array for existing tracks
+            tracks.forEach(track => {
+                if (track.notes.length < NUM_STEPS) {
+                    // Pad with false if new length is greater
+                    track.notes = track.notes.concat(Array(NUM_STEPS - track.notes.length).fill(false));
+                } else if (track.notes.length > NUM_STEPS) {
+                    // Truncate if new length is smaller
+                    track.notes = track.notes.slice(0, NUM_STEPS);
+                }
+            });
+            currentStep = 0; // Reset current step
+            if (isPlaying) {
+                pauseSequencer(); // Pause if playing
+            }
+            renderSequencerGrid(); // Re-render the grid
+            saveState(); // Save state after changing grid length
+        }
+
+        /**
+         * Displays a custom message box instead of alert().
+         * @param {string} message - The message to display.
+         * @param {string} type - 'Info', 'Success', or 'Error'.
+         */
+        function showMessageBox(message, type = 'Info') {
+            const messageBoxId = 'customMessageBox';
+            let messageBox = document.getElementById(messageBoxId);
+
+            if (!messageBox) {
+                messageBox = document.createElement('div');
+                messageBox.id = messageBoxId;
+                messageBox.className = 'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-800 text-white p-6 rounded-lg shadow-lg z-50 flex flex-col items-center';
+                messageBox.style.minWidth = '300px';
+                messageBox.style.maxWidth = '90%';
+                document.body.appendChild(messageBox);
+            }
+
+            let bgColor = 'bg-gray-800';
+            let textColor = 'text-white';
+            if (type === 'Error') {
+                bgColor = 'bg-red-700';
+            } else if (type === 'Success') {
+                bgColor = 'bg-green-700';
+            } else if (type === 'Info') {
+                bgColor = 'bg-blue-700';
+            }
+
+            messageBox.className = `fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${bgColor} ${textColor} p-6 rounded-lg shadow-lg z-50 flex flex-col items-center`;
+            messageBox.innerHTML = `
+                <p class="mb-4 text-center">${message}</p>
+                <button id="messageBoxClose" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-md">OK</button>
+            `;
+            messageBox.style.display = 'flex'; // Make sure it's visible
+
+            document.getElementById('messageBoxClose').onclick = () => {
+                messageBox.style.display = 'none';
+            };
+
+            // Hide after a few seconds if not an error
+            if (type !== 'Error') {
+                setTimeout(() => {
+                    if (messageBox.style.display !== 'none') { // Only hide if not manually closed
+                        messageBox.style.display = 'none';
+                    }
+                }, 3000);
+            }
+        }
+
+        // --- Undo/Redo Functions ---
+
+        /**
+         * Saves the current state of tracks and BPM to history.
+         */
+        function saveState() {
+            // Clear any "future" states if we're not at the end of history
+            if (historyPointer < history.length - 1) {
+                history = history.slice(0, historyPointer + 1);
+            }
+
+            // Deep clone tracks to avoid reference issues
+            const stateToSave = {
+                tracks: deepClone(tracks),
+                bpm: bpm,
+                numSteps: NUM_STEPS,
+                projectName: projectNameInput.value // Save project name in history
+            };
+            history.push(stateToSave);
+
+            // Limit history size
+            if (history.length > MAX_HISTORY) {
+                history.shift(); // Remove the oldest state
+            } else {
+                historyPointer++;
+            }
+            updateUndoRedoButtons();
+            console.log('State saved. History length:', history.length, 'Pointer:', historyPointer);
+        }
+
+        /**
+         * Restores the previous state from history.
+         */
+        function undo() {
+            if (historyPointer > 0) {
+                historyPointer--;
+                applyState(history[historyPointer]);
+                console.log('Undo. History length:', history.length, 'Pointer:', historyPointer);
+            }
+            updateUndoRedoButtons();
+        }
+
+        /**
+         * Restores the next state from history (after an undo).
+         */
+        function redo() {
+            if (historyPointer < history.length - 1) {
+                historyPointer++;
+                applyState(history[historyPointer]);
+                console.log('Redo. History length:', history.length, 'Pointer:', historyPointer);
+            }
+            updateUndoRedoButtons();
+        }
+
+        /**
+         * Applies a saved state to the current sequencer.
+         * @param {object} state - The state object to apply.
+         */
+        function applyState(state) {
+            // Restore tracks, ensuring AudioBuffers are correctly referenced (they are immutable)
+            tracks = state.tracks.map(trackState => {
+                const existingTrack = tracks.find(t => t.id === trackState.id);
+                return {
+                    ...trackState,
+                    audioBuffer: existingTrack ? existingTrack.audioBuffer : null // Reuse existing AudioBuffer reference
+                };
+            });
+            bpm = state.bpm;
+            bpmInput.value = bpm;
+            NUM_STEPS = state.numSteps;
+            gridLengthSelect.value = NUM_STEPS;
+            projectNameInput.value = state.projectName || "Mi Canción"; // Restore project name
+
+            // Pause and re-render to reflect changes
+            if (isPlaying) {
+                pauseSequencer();
+            }
+            renderSequencerGrid();
+            updateLanguage(); // Re-apply language after state change
+        }
+
+        /**
+         * Updates the disabled state of undo/redo buttons.
+         */
+        function updateUndoRedoButtons() {
+            undoButton.disabled = historyPointer <= 0;
+            redoButton.disabled = historyPointer >= history.length - 1;
+        }
+
+        // --- Event Listeners ---
+
+        projectNameInput.addEventListener('input', () => {
+            // No saveState here, only when a significant action happens
+            // The value is read directly in downloadSong
+        });
+
+        recordButton.addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        });
+
+        playButton.addEventListener('click', startSequencer);
+        pauseButton.addEventListener('click', pauseSequencer);
+        downloadSongButton.addEventListener('click', downloadSong);
+        undoButton.addEventListener('click', undo);
+        redoButton.addEventListener('click', redo);
+
+        bpmInput.addEventListener('change', (event) => {
+            const newBPM = parseInt(event.target.value);
+            if (newBPM >= 60 && newBPM <= 240) {
+                bpm = newBPM;
+                if (isPlaying) {
+                    // Restart sequencer with new BPM
+                    pauseSequencer();
+                    startSequencer();
+                }
+                saveState(); // Save state after BPM change
+            } else {
+                showMessageBox(languageStrings[currentLanguage].bpmRangeError, 'Error');
+                bpmInput.value = bpm; // Revert to previous valid BPM
+            }
+        });
+
+        gridLengthSelect.addEventListener('change', (event) => {
+            setGridLength(parseInt(event.target.value));
+        });
+
+        languageToggle.addEventListener('click', () => {
+            currentLanguage = currentLanguage === 'en' ? 'es' : 'en';
+            updateLanguage();
+            renderSequencerGrid(); // Re-render to apply language to dynamic elements
+        });
+
+        // Initial render of the grid (empty) and save initial state
+        window.onload = () => {
+            updateLanguage(); // Set initial language
+            renderSequencerGrid();
+            saveState(); // Save initial empty state
+            setupGlobalTrimListeners(); // Setup global mouse/touch listeners for dragging
+            // Initialize AudioContext on user gesture for browser compatibility
+            document.body.addEventListener('click', () => {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }, { once: true });
+        };
+
+    </script>
+</body>
+</html>
